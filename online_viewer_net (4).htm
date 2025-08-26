@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<head>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+  #dashboard4D { width:100%; height:95vh; }
+  .controls { position:absolute; top:10px; left:10px; z-index:10; background:rgba(0,0,0,0.5); padding:10px; border-radius:8px; }
+  select { background:#111; color:#0ff; border:1px solid #0ff; padding:5px 10px; margin-right:10px; border-radius:6px; }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  Floor:
+  <select id="floorSelect">
+    <option value="ALL">All Floors</option>
+    <option value="1st_Floor">1st Floor</option>
+    <option value="M_Floor">M Floor</option>
+    <option value="2nd_Floor">2nd Floor</option>
+    <option value="3rd_Floor">3rd Floor</option>
+    <option value="4th_Floor">4th Floor</option>
+    <option value="5th_Floor">5th Floor</option>
+  </select>
+
+  Parameter:
+  <select id="paramSelect">
+    <option value="CO2">CO2</option>
+    <option value="Temperature">Temperature</option>
+    <option value="Humidity">Humidity</option>
+    <option value="PM2.5">PM2.5</option>
+  </select>
+</div>
+
+<div id="dashboard4D"></div>
+
+<script>
+// Config
+const floors = ["1st_Floor","M_Floor","2nd_Floor","3rd_Floor","4th_Floor","5th_Floor"];
+const hours = [...Array(24).keys()]; // 0-23
+const params = ["CO2","Temperature","Humidity","PM2.5"];
+
+// Generate random 4D data
+function generate4DData(param) {
+  const data = [];
+  floors.forEach((floor, fIndex) => {
+    hours.forEach(hour => {
+      const value = +(Math.random() * (param==="CO2"?40: param==="Temperature"?28: param==="Humidity"?60:25) + (param==="CO2"?400: param==="Temperature"?22: param==="Humidity"?40:5)).toFixed(1);
+      data.push({
+        x: hour,
+        y: fIndex,
+        z: value,
+        size: value/10 + 1,
+        color: value,
+        floor: floor,
+        hour: hour,
+        param: param
+      });
+    });
+  });
+  return data;
+}
+
+// Initial trace
+let currentParam = "CO2";
+let rawData = generate4DData(currentParam);
+
+// Transform to Plotly trace
+function createTrace(param) {
+  const filtered = rawData.filter(d => d.param === param);
+  return {
+    x: filtered.map(d=>d.x),
+    y: filtered.map(d=>d.y),
+    z: filtered.map(d=>d.z),
+    mode: 'markers',
+    type: 'scatter3d',
+    marker: {
+      size: filtered.map(d=>d.size),
+      color: filtered.map(d=>d.color),
+      colorscale:'Jet',
+      opacity:0.8,
+      colorbar:{title:param, tickfont:{color:'#0ff'}}
+    },
+    text: filtered.map(d=>`${d.floor} - Hour ${d.hour} - ${param}: ${d.z}`),
+    hoverinfo:'text'
+  };
+}
+
+let trace = createTrace(currentParam);
+
+// Layout
+let layout = {
+  paper_bgcolor:'#000',
+  plot_bgcolor:'#000',
+  scene:{
+    xaxis:{title:'Hour', color:'#0ff', gridcolor:'#00ffff33'},
+    yaxis:{title:'Floor', tickvals: floors.map((_,i)=>i), ticktext: floors, color:'#0ff', gridcolor:'#00ffff33'},
+    zaxis:{title:'Value', color:'#0ff', gridcolor:'#00ffff33'},
+    camera:{eye:{x:2,y:2,z:2}}
+  },
+  margin:{l:0,r:0,b:0,t:0},
+  showlegend:false
+};
+
+// Plot initial
+Plotly.newPlot('dashboard4D',[trace],layout,{responsive:true, displayModeBar:true});
+
+// Update on select change
+document.getElementById('paramSelect').addEventListener('change', e=>{
+  currentParam = e.target.value;
+  rawData = generate4DData(currentParam);
+  Plotly.react('dashboard4D',[createTrace(currentParam)],layout,{responsive:true, displayModeBar:true});
+});
+
+document.getElementById('floorSelect').addEventListener('change', e=>{
+  const floor = e.target.value;
+  let filteredData = rawData;
+  if(floor !== "ALL") filteredData = rawData.filter(d=>d.floor===floor);
+  Plotly.react('dashboard4D',[{
+    x: filteredData.map(d=>d.x),
+    y: filteredData.map(d=>d.y),
+    z: filteredData.map(d=>d.z),
+    mode:'markers',
+    type:'scatter3d',
+    marker:{
+      size: filteredData.map(d=>d.size),
+      color: filteredData.map(d=>d.color),
+      colorscale:'Jet',
+      opacity:0.8
+    },
+    text: filteredData.map(d=>`${d.floor} - Hour ${d.hour} - ${d.param}: ${d.z}`),
+    hoverinfo:'text'
+  }],layout,{responsive:true, displayModeBar:true});
+});
+</script>
+
+</body>
+</html>
